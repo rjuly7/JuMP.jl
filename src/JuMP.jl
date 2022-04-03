@@ -1404,4 +1404,6 @@ end
 include("precompile.jl")
 _precompile_()
 
+include("Nonlinear/Nonlinear.jl")
+
 end
