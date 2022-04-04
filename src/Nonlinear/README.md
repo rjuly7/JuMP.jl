@@ -65,10 +65,13 @@ Nonlinear.set_objective(data, :($p + $expr + $x))
 
 Add a constraint using `add_constraint`:
 ```julia
-c = Nonlinear.add_constraint(data, :(1 + sqrt($x)), MOI.LessThan(2.0))
+c = Nonlinear.add_constraint(data, :(1 + sqrt($x) <= 2.0))
 ```
 The return value, `c`, is a `Nonlinear.ConstraintIndex` that is a unique
-identifier for the constraint.
+identifier for the constraint. Interval constraints are also supported:
+```julia
+c = Nonlinear.add_constraint(data, :(-1.0 <= 1 + sqrt($x) <= 2.0))
+```
 
 Delete a constraint using `delete`:
 ```julia
