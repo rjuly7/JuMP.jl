@@ -47,24 +47,12 @@ struct ParameterIndex
     value::Int
 end
 
-function Base.getindex(data::NonlinearData, index::ParameterIndex)
-    return data.parameters[index.value]
-end
-
 struct ExpressionIndex
     value::Int
 end
 
-function Base.getindex(data::NonlinearData, index::ExpressionIndex)
-    return data.expressions[index.value]
-end
-
 struct ConstraintIndex
     value::Int
-end
-
-function Base.getindex(data::NonlinearData, index::ConstraintIndex)
-    return data.constraints[index.value]
 end
 
 mutable struct NonlinearData
@@ -84,4 +72,16 @@ mutable struct NonlinearData
             0,
         )
     end
+end
+
+function Base.getindex(data::NonlinearData, index::ParameterIndex)
+    return data.parameters[index.value]
+end
+
+function Base.getindex(data::NonlinearData, index::ExpressionIndex)
+    return data.expressions[index.value]
+end
+
+function Base.getindex(data::NonlinearData, index::ConstraintIndex)
+    return data.constraints[index.value]
 end

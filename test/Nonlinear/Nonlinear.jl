@@ -27,9 +27,7 @@ function test_moi_variable_parse()
     data = Nonlinear.NonlinearData()
     x = MOI.VariableIndex(1)
     expr = Nonlinear.parse_expression(data, :($x))
-    @test expr.nodes == [
-        Nonlinear.Node(Nonlinear.NODE_MOI_VARIABLE, 1, -1),
-    ]
+    @test expr.nodes == [Nonlinear.Node(Nonlinear.NODE_MOI_VARIABLE, 1, -1)]
     @test isempty(expr.values)
     return
 end
@@ -46,9 +44,7 @@ function test_parameter_parse()
     data = Nonlinear.NonlinearData()
     p = Nonlinear.add_parameter(data, 1.2)
     expr = Nonlinear.parse_expression(data, :($p))
-    @test expr.nodes == [
-        Nonlinear.Node(Nonlinear.NODE_PARAMETER, 1, -1),
-    ]
+    @test expr.nodes == [Nonlinear.Node(Nonlinear.NODE_PARAMETER, 1, -1)]
     @test isempty(expr.values)
     @test data.parameters == [1.2]
     return

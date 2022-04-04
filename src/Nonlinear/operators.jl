@@ -42,31 +42,28 @@ struct UnivariateOperator{F,F′,F′′}
     f::F
     f′::F′
     f′′::F′′
-    function UnivariateOperator(f::Function)
-        f′ = x -> ForwardDiff.derivative(f, x)
-        f′′ = x -> ForwardDiff.derivative(f′, x)
-        return new{typeof(f),typeof(f′),typeof(f′′)}(f, f′, f′′)
-    end
-    function UnivariateOperator(f::Function, f′::Function)
-        f′′ = x -> ForwardDiff.derivative(f′, x)
-        return new{typeof(f),typeof(f′),typeof(f′′)}(f, f′, f′′)
-    end
-    function UnivariateOperator(f::Function, f′::Function, f′′::Function)
-        return new{typeof(f),typeof(f′),typeof(f′′)}(f, f′, f′′)
-    end
 end
 
-struct MultivariateOperator{N,F,F′,F′′} <: MOI.AbstractNonlinearEvaluator
+function UnivariateOperator(f::Function)
+    return UnivariateOperator(f, x -> ForwardDiff.derivative(f, x))
+end
+
+function UnivariateOperator(f::Function, f′::Function)
+    return UnivariateOperator(f, f′, x -> ForwardDiff.derivative(f′, x))
+end
+
+struct MultivariateOperator{N,F,F′,F′′}
     f::F
     ∇f::F′
     ∇²f::F′
-    function MultivariateOperator{N}(f::Function, ∇f::Function)
-        return new{N,typeof(f),typeof(∇f)}(f, ∇f, nothing)
+    function MultivariateOperator{N}(f::Function, ∇f::Function) where {N}
+        return new{N,typeof(f),typeof(∇f),Nothing}(f, ∇f, nothing)
     end
-    function MultivariateOperator{N}(f::Function)
-        ∇f = (g, x) -> ForwardDiff.gradient!(g, f, x)
-        return new{N,typeof(f),typeof(∇f)}(f, ∇f)
-    end
+end
+
+function MultivariateOperator{N}(f::Function) where {N}
+    ∇f = (g, x) -> ForwardDiff.gradient!(g, f, x)
+    return MultivariateOperator{N}(f, ∇f)
 end
 
 struct OperatorRegistry

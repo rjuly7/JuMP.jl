@@ -107,7 +107,7 @@ function register_operator(
     data::NonlinearData,
     op::Symbol,
     nargs::Int,
-    f::Function...
+    f::Function...,
 )
     if nargs == 1
         _register_univariate_operator(data.operators, op, f...)
