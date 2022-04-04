@@ -33,6 +33,10 @@ struct NonlinearExpression
     NonlinearExpression() = new(Node[], Float64[])
 end
 
+function Base.:(==)(x::NonlinearExpression, y::NonlinearExpression)
+    return x.nodes == y.nodes && x.values == y.values
+end
+
 struct NonlinearConstraint
     expression::NonlinearExpression
     set::Union{
@@ -83,5 +87,5 @@ function Base.getindex(data::NonlinearData, index::ExpressionIndex)
 end
 
 function Base.getindex(data::NonlinearData, index::ConstraintIndex)
-    return data.constraints[index.value]
+    return data.constraints[index]
 end

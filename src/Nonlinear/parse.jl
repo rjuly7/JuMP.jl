@@ -136,3 +136,32 @@ function _parse_expression(
     push!(expr.nodes, Node(NODE_SUBEXPRESSION, x.value, parent_index))
     return
 end
+
+function _normalize_constraint_expr(lhs::Real, body, rhs::Real)
+    return Float64(lhs), body, Float64(rhs)
+end
+
+_normalize_constraint_expr(lhs, body, rhs) = error()
+
+_normalize_constraint_expr(lhs, rhs::Real) = lhs, Float64(rhs)
+
+_normalize_constraint_expr(lhs, rhs) = Expr(:call, :-, lhs, rhs), 0.0
+
+function _expr_to_constraint(expr::Expr)
+    if isexpr(expr, :comparison)
+        @assert expr.args[2] == expr.args[4]
+        @assert expr.args[2] in (:<=, :>=)
+        lhs, body, rhs =
+            _normalize_constraint_expr(expr.args[1], expr.args[3], expr.args[5])
+        return body, MOI.Interval(lhs, rhs)
+    end
+    lhs, rhs = _normalize_constraint_expr(expr.args[2], expr.args[3])
+    if expr.args[1] == :<=
+        return lhs, MOI.LessThan(rhs)
+    elseif expr.args[1] == :>=
+        return lhs, MOI.GreaterThan(rhs)
+    else
+        @assert expr.args[1] == :(==)
+        return lhs, MOI.EqualTo(rhs)
+    end
+end

@@ -19,7 +19,6 @@ function test_parse_sin()
     data = Nonlinear.NonlinearData()
     x = MOI.VariableIndex(1)
     expr = Nonlinear.parse_expression(data, :(sin($x)))
-    # @test evaluate(data, ex, Dict(x => 1.5)) == sin(1.5)
     return
 end
 
@@ -58,6 +57,68 @@ function test_parameter_set()
     Nonlinear.set_parameter(data, p, 2.1)
     @test data.parameters == [2.1]
     @test data[p] == 2.1
+    return
+end
+
+function test_set_objective()
+    data = Nonlinear.NonlinearData()
+    x = MOI.VariableIndex(1)
+    input = :($x^2 + 1)
+    Nonlinear.set_objective(data, input)
+    @test data.objective == Nonlinear.parse_expression(data, input)
+    return
+end
+
+function test_add_constraint_less_than()
+    data = Nonlinear.NonlinearData()
+    x = MOI.VariableIndex(1)
+    input = :($x^2 + 1 <= 1.0)
+    c = Nonlinear.add_constraint(data, input)
+    @test data[c].set == MOI.LessThan(1.0)
+    return
+end
+
+function test_add_constraint_less_than_normalize()
+    data = Nonlinear.NonlinearData()
+    x = MOI.VariableIndex(1)
+    input = :(1 <= 1.0 + $x^2)
+    c = Nonlinear.add_constraint(data, input)
+    @test data[c].set == MOI.LessThan(0.0)
+    return
+end
+
+function test_add_constraint_greater_than()
+    data = Nonlinear.NonlinearData()
+    x = MOI.VariableIndex(1)
+    input = :($x^2 + 1 >= 1.0)
+    c = Nonlinear.add_constraint(data, input)
+    @test data[c].set == MOI.GreaterThan(1.0)
+    return
+end
+
+function test_add_constraint_equal_to()
+    data = Nonlinear.NonlinearData()
+    x = MOI.VariableIndex(1)
+    input = :($x^2 + 1 == 1.0)
+    c = Nonlinear.add_constraint(data, input)
+    @test data[c].set == MOI.EqualTo(1.0)
+    return
+end
+
+function test_add_constraint_interval()
+    data = Nonlinear.NonlinearData()
+    x = MOI.VariableIndex(1)
+    input = :(-1.0 <= $x^2 + 1 <= 1.0)
+    c = Nonlinear.add_constraint(data, input)
+    @test data[c].set == MOI.Interval(-1.0, 1.0)
+    return
+end
+
+function test_add_constraint_interval_normalize()
+    data = Nonlinear.NonlinearData()
+    x = MOI.VariableIndex(1)
+    input = :(-1.0 + $x <= $x^2 + 1 <= 1.0)
+    @test_throws(ErrorException, Nonlinear.add_constraint(data, input))
     return
 end
 

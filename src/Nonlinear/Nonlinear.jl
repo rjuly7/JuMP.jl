@@ -28,31 +28,15 @@ function add_expression(data::NonlinearData, expr)
 end
 
 """
-    add_constraint(
-        data::NonlinearData,
-        expr::Expr,
-        set::Union{
-            MOI.LessThan{Float64},
-            MOI.GreaterThan{Float64},
-            MOI.EqualTo{Float64},
-            MOI.Interval{Float64},
-        },
-    )
+    add_constraint(data::NonlinearData, expr::Expr)
 """
-function add_constraint(
-    data::NonlinearData,
-    expr::Expr,
-    set::Union{
-        MOI.LessThan{Float64},
-        MOI.GreaterThan{Float64},
-        MOI.EqualTo{Float64},
-        MOI.Interval{Float64},
-    },
-)
+function add_constraint(data::NonlinearData, input::Expr)
+    expr, set = _expr_to_constraint(input)
     f = parse_expression(data, expr)
     data.last_constraint_index += 1
-    data.constraints[data.last_constraint_index] = NonlinearConstraint(f, set)
-    return ConstraintIndex(data.last_constraint_index)
+    index = ConstraintIndex(data.last_constraint_index)
+    data.constraints[index] = NonlinearConstraint(f, set)
+    return index
 end
 
 """
