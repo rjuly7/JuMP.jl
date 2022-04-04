@@ -1,6 +1,6 @@
 function _create_binary_switch(ids, exprs)
     if length(exprs) <= 3
-        out = Expr(:if, Expr(:call, :(==), :operator_id, ids[1]), exprs[1])
+        out = Expr(:if, Expr(:call, :(==), :id, ids[1]), exprs[1])
         if length(exprs) > 1
             push!(out.args, _create_binary_switch(ids[2:end], exprs[2:end]))
         end
@@ -9,7 +9,7 @@ function _create_binary_switch(ids, exprs)
         mid = length(exprs) >>> 1
         return Expr(
             :if,
-            Expr(:call, :(<=), :operator_id, ids[mid]),
+            Expr(:call, :(<=), :id, ids[mid]),
             _create_binary_switch(ids[1:mid], exprs[1:mid]),
             _create_binary_switch(ids[mid+1:end], exprs[mid+1:end]),
         )
@@ -19,7 +19,7 @@ end
 let exprs = map(SYMBOLIC_UNIVARIATE_EXPRESSIONS) do arg
         return :(return $(arg[1])(x), $(arg[2]))
     end
-    @eval @inline function _eval_univariate(operator_id, x::T) where {T}
+    @eval @inline function _eval_univariate(id, x::T) where {T}
         $(_create_binary_switch(1:length(exprs), exprs))
         return error("Invalid operator_id")
     end
@@ -32,11 +32,7 @@ let exprs = map(SYMBOLIC_UNIVARIATE_EXPRESSIONS) do arg
             :(return $(arg[3]))
         end
     end
-    @eval @inline function _eval_univariate_2nd_deriv(
-        operator_id,
-        x::T,
-        ::T,  # TODO: we could re-use the function evaluation
-    ) where {T}
+    @eval @inline function _eval_univariate_2nd_deriv(id, x::T) where {T}
         $(_create_binary_switch(1:length(exprs), exprs))
         return error("Invalid operator_id")
     end
@@ -60,7 +56,18 @@ struct UnivariateOperator{F,F′,F′′}
     end
 end
 
-struct MultivariateOperator end
+struct MultivariateOperator{N,F,F′,F′′} <: MOI.AbstractNonlinearEvaluator
+    f::F
+    ∇f::F′
+    ∇²f::F′
+    function MultivariateOperator{N}(f::Function, ∇f::Function)
+        return new{N,typeof(f),typeof(∇f)}(f, ∇f, nothing)
+    end
+    function MultivariateOperator{N}(f::Function)
+        ∇f = (g, x) -> ForwardDiff.gradient!(g, f, x)
+        return new{N,typeof(f),typeof(∇f)}(f, ∇f)
+    end
+end
 
 struct OperatorRegistry
     # NODE_CALL_UNIVARIATE
@@ -111,32 +118,103 @@ struct OperatorRegistry
     end
 end
 
-function register_univariate_operator(
+function _register_univariate_operator(
     registry::OperatorRegistry,
     op::Symbol,
-    operator::UnivariateOperator,
+    f::Function...,
 )
+    operator = UnivariateOperator(f...)
     push!(registry.univariate_operators, operator)
+    push!(registry.registered_univariate_operators, operator)
     registry.univariate_operator_to_id[op] =
         length(registry.univariate_operators)
     return
 end
 
-function register_univariate_operator(
+function eval_univariate_function(
     registry::OperatorRegistry,
     op::Symbol,
-    f::Function...,
-)
-    return register_univariate_operator(registry, op, UnivariateOperator(f...))
-end
-
-function evaluate_univariate(r::OperatorRegistry, id::Int, x::T)::T where {T}
-    offset = id - r.univariate_user_operator_start
-    if offset < 1
+    x::T,
+)::T where {T}
+    id = registry.univariate_operator_to_id[op]
+    if id <= registry.univariate_user_operator_start
         f, _ = _eval_univariate(id, x)
         return f
     else
-        operator = r.registered_univariate_operators[offset]
+        offset = id - registry.univariate_user_operator_start
+        operator = registry.registered_univariate_operators[offset]
         return operator.f(x)
     end
+end
+
+function eval_univariate_gradient(
+    registry::OperatorRegistry,
+    op::Symbol,
+    x::T,
+) where {T}
+    id = registry.univariate_operator_to_id[op]
+    if id <= registry.univariate_user_operator_start
+        _, f′ = _eval_univariate(id, x)
+        return f′
+    else
+        offset = id - registry.univariate_user_operator_start
+        operator = registry.registered_univariate_operators[offset]
+        return operator.f′(x)
+    end
+end
+
+function eval_univariate_hessian(
+    registry::OperatorRegistry,
+    op::Symbol,
+    x::T,
+) where {T}
+    id = registry.univariate_operator_to_id[op]
+    if id <= registry.univariate_user_operator_start
+        return _eval_univariate_2nd_deriv(id, x)
+    else
+        offset = id - registry.univariate_user_operator_start
+        operator = registry.registered_univariate_operators[offset]
+        return operator.f′′(x)
+    end
+end
+
+function _register_multivariate_operator(
+    registry::OperatorRegistry,
+    op::Symbol,
+    nargs::Int,
+    f::Function...,
+)
+    operator = MultivariateOperator{nargs}(f...)
+    push!(registry.multivariate_operators, operator)
+    registry.multivariate_operator_to_id[op] =
+        length(registry.multivariate_operators)
+    return
+end
+
+function eval_multivariate_function(
+    operator::MultivariateOperator{N},
+    x::AbstractVector{T},
+) where {T,N}
+    @assert length(x) == N
+    return operator.f(x)::T
+end
+
+function eval_multivariate_gradient(
+    operator::MultivariateOperator{N},
+    g::AbstractVector{T},
+    x::AbstractVector{T},
+) where {T,N}
+    @assert length(x) == N
+    operator.∇f(g, x)
+    return
+end
+
+function eval_multivariate_hessian(
+    operator::MultivariateOperator{N},
+    H::AbstractMatrix{T},
+    x::AbstractVector{T},
+) where {T,N}
+    @assert length(x) == N
+    operator.∇²f(H, x)
+    return
 end

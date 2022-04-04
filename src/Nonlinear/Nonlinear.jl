@@ -110,9 +110,9 @@ function register_operator(
     f::Function...
 )
     if nargs == 1
-        register_univariate_operator(data.operators, op, f...)
+        _register_univariate_operator(data.operators, op, f...)
     else
-        @assert false
+        _register_multivariate_operator(data.operators, op, nargs, f...)
     end
     return
 end

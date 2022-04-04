@@ -49,6 +49,7 @@ const MOIB = MOI.Bridges
 import Calculus
 import OrderedCollections.OrderedDict
 import ForwardDiff
+include("Nonlinear/Nonlinear.jl")
 include("_Derivatives/_Derivatives.jl")
 using ._Derivatives
 
@@ -1403,7 +1404,5 @@ end
 
 include("precompile.jl")
 _precompile_()
-
-include("Nonlinear/Nonlinear.jl")
 
 end
