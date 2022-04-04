@@ -109,10 +109,19 @@ function register_operator(
     nargs::Int,
     f::Function...,
 )
+    registry = data.operators
     if nargs == 1
-        _register_univariate_operator(data.operators, op, f...)
+        operator = UnivariateOperator(f...)
+        push!(registry.univariate_operators, op)
+        push!(registry.registered_univariate_operators, operator)
+        registry.univariate_operator_to_id[op] =
+            length(registry.univariate_operators)
     else
-        _register_multivariate_operator(data.operators, op, nargs, f...)
+        operator = MultivariateOperator{nargs}(f...)
+        push!(registry.multivariate_operators, op)
+        push!(registry.registered_multivariate_operators, operator)
+        registry.multivariate_operator_to_id[op] =
+            length(registry.multivariate_operators)
     end
     return
 end

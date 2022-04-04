@@ -115,19 +115,6 @@ struct OperatorRegistry
     end
 end
 
-function _register_univariate_operator(
-    registry::OperatorRegistry,
-    op::Symbol,
-    f::Function...,
-)
-    operator = UnivariateOperator(f...)
-    push!(registry.univariate_operators, operator)
-    push!(registry.registered_univariate_operators, operator)
-    registry.univariate_operator_to_id[op] =
-        length(registry.univariate_operators)
-    return
-end
-
 function eval_univariate_function(
     registry::OperatorRegistry,
     op::Symbol,
@@ -175,19 +162,6 @@ function eval_univariate_hessian(
     end
 end
 
-function _register_multivariate_operator(
-    registry::OperatorRegistry,
-    op::Symbol,
-    nargs::Int,
-    f::Function...,
-)
-    operator = MultivariateOperator{nargs}(f...)
-    push!(registry.multivariate_operators, operator)
-    registry.multivariate_operator_to_id[op] =
-        length(registry.multivariate_operators)
-    return
-end
-
 function eval_multivariate_function(
     operator::MultivariateOperator{N},
     x::AbstractVector{T},
@@ -214,4 +188,14 @@ function eval_multivariate_hessian(
     @assert length(x) == N
     operator.∇²f(H, x)
     return
+end
+
+# These are not extendable!
+function eval_logic_function(op::Symbol, lhs::T, rhs::T)::Bool where {T}
+    return getfield(Base, op)(lhs, rhs)
+end
+
+# These are not extendable!
+function eval_comparison_function(op::Symbol, lhs::T, rhs::T)::Bool where {T}
+    return getfield(Base, op)(lhs, rhs)
 end
