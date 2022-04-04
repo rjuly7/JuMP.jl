@@ -1,6 +1,7 @@
 module Nonlinear
 
 import Base.Meta: isexpr
+import ForwardDiff
 import MathOptInterface
 
 const MOI = MathOptInterface
@@ -109,21 +110,7 @@ function register_operator(
     nargs::Int,
     f::Function...,
 )
-    registry = data.operators
-    if nargs == 1
-        operator = UnivariateOperator(f...)
-        push!(registry.univariate_operators, op)
-        push!(registry.registered_univariate_operators, operator)
-        registry.univariate_operator_to_id[op] =
-            length(registry.univariate_operators)
-    else
-        operator = MultivariateOperator{nargs}(f...)
-        push!(registry.multivariate_operators, op)
-        push!(registry.registered_multivariate_operators, operator)
-        registry.multivariate_operator_to_id[op] =
-            length(registry.multivariate_operators)
-    end
-    return
+    return register_operator(data.operators, op, nargs, f...)
 end
 
 end  # module

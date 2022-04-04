@@ -52,12 +52,12 @@ function UnivariateOperator(f::Function, f′::Function)
     return UnivariateOperator(f, f′, x -> ForwardDiff.derivative(f′, x))
 end
 
-struct MultivariateOperator{N,F,F′,F′′}
+struct MultivariateOperator{F,F′}
+    N::Int
     f::F
     ∇f::F′
-    ∇²f::F′
     function MultivariateOperator{N}(f::Function, ∇f::Function) where {N}
-        return new{N,typeof(f),typeof(∇f),Nothing}(f, ∇f, nothing)
+        return new{typeof(f),typeof(∇f)}(N, f, ∇f)
     end
 end
 
@@ -72,7 +72,7 @@ struct OperatorRegistry
     univariate_operator_to_id::Dict{Symbol,Int}
     univariate_user_operator_start::Int
     registered_univariate_operators::Vector{UnivariateOperator}
-    # NODE_CALL
+    # NODE_CALL_MULTIVARIATE
     multivariate_operators::Vector{Symbol}
     multivariate_operator_to_id::Dict{Symbol,Int}
     multivariate_user_operator_start::Int
@@ -113,6 +113,28 @@ struct OperatorRegistry
             ),
         )
     end
+end
+
+function register_operator(
+    registry::OperatorRegistry,
+    op::Symbol,
+    nargs::Int,
+    f::Function...,
+)
+    if nargs == 1
+        operator = UnivariateOperator(f...)
+        push!(registry.univariate_operators, op)
+        push!(registry.registered_univariate_operators, operator)
+        registry.univariate_operator_to_id[op] =
+            length(registry.univariate_operators)
+    else
+        operator = MultivariateOperator{nargs}(f...)
+        push!(registry.multivariate_operators, op)
+        push!(registry.registered_multivariate_operators, operator)
+        registry.multivariate_operator_to_id[op] =
+            length(registry.multivariate_operators)
+    end
+    return
 end
 
 function eval_univariate_function(
@@ -163,39 +185,103 @@ function eval_univariate_hessian(
 end
 
 function eval_multivariate_function(
-    operator::MultivariateOperator{N},
+    registry::OperatorRegistry,
+    op::Symbol,
     x::AbstractVector{T},
-) where {T,N}
-    @assert length(x) == N
-    return operator.f(x)::T
+)::T where {T}
+    if op == :+
+        return +(x...)
+    elseif op == :-
+        return -(x...)
+    elseif op == :*
+        return *(x...)
+    elseif op == :^
+        @assert length(x) == 2
+        return x[1]^x[2]
+    elseif op == :/
+        @assert length(x) == 2
+        return x[1] / x[2]
+    elseif op == :ifelse
+        @assert length(x) == 3
+        return ifelse(Bool(x[1]), x[2], x[3])
+    end
+    id = registry.multivariate_operator_to_id[op]
+    offset = id - registry.multivariate_user_operator_start
+    operator = registry.registered_multivariate_operators[offset]
+    @assert length(x) == operator.N
+    return operator.f(x)
 end
 
 function eval_multivariate_gradient(
-    operator::MultivariateOperator{N},
+    registry::OperatorRegistry,
+    op::Symbol,
     g::AbstractVector{T},
     x::AbstractVector{T},
-) where {T,N}
-    @assert length(x) == N
-    operator.∇f(g, x)
+) where {T}
+    if op == :+
+        fill!(g, 1.0)
+    elseif op == :-
+        fill!(g, -1.0)
+        g[1] = 1.0
+    elseif op == :*
+        total = *(x...)
+        for i in 1:length(x)
+            g[i] = total / x[i]
+        end
+    elseif op == :^
+        @assert length(x) == 2
+        g[1] = x[2] * x[1]^(x[2] - 1)
+        g[2] = x[1]^x[2] * log(x[1])
+    elseif op == :/
+        @assert length(x) == 2
+        g[1] = 1 / x[2]
+        g[2] = -x[1] / x[2]^2
+    elseif op == :ifelse
+        @assert length(x) == 3
+        g[1] = NaN
+        g[2] = x[1] == 1.0
+        g[3] = x[1] == 0.0
+    else
+        id = registry.multivariate_operator_to_id[op]
+        offset = id - registry.multivariate_user_operator_start
+        operator = registry.registered_multivariate_operators[offset]
+        @assert length(x) == operator.N
+        operator.∇f(g, x)
+    end
     return
 end
 
 function eval_multivariate_hessian(
-    operator::MultivariateOperator{N},
-    H::AbstractMatrix{T},
-    x::AbstractVector{T},
-) where {T,N}
-    @assert length(x) == N
-    operator.∇²f(H, x)
-    return
+    ::OperatorRegistry,
+    ::Symbol,
+    ::AbstractMatrix{T},
+    ::AbstractVector{T},
+) where {T}
+    return error("Not implemented")
 end
 
 # These are not extendable!
 function eval_logic_function(op::Symbol, lhs::T, rhs::T)::Bool where {T}
-    return getfield(Base, op)(lhs, rhs)
+    if op == :&&
+        return lhs && rhs
+    else
+        @assert op == :||
+        return lhs || rhs
+    end
 end
 
 # These are not extendable!
 function eval_comparison_function(op::Symbol, lhs::T, rhs::T)::Bool where {T}
-    return getfield(Base, op)(lhs, rhs)
+    if op == :<=
+        return lhs <= rhs
+    elseif op == :>=
+        return lhs >= rhs
+    elseif op == :(==)
+        return lhs == rhs
+    elseif op == :<
+        return lhs < rhs
+    else
+        @assert op == :>
+        return lhs > rhs
+    end
 end
